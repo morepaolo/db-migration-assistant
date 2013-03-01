@@ -11,7 +11,7 @@ $admin_email="morepaolo@gmail.com";
 
 // DA QUA IN POI TESTO ADODB
 $adodb_params = Array(
-	"database_type" => "",
+	"database_type" => "mssqlnative",
 	"host" => "(local)\SQLEXPRESS",
 	"user" => "sa",
 	"password" => "sql_749412",

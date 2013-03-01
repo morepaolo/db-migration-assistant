@@ -168,6 +168,52 @@ class mssqlnative_2_postgres9 extends generic_driver{
 		return($view_definition);
 	}
 	
+	public function sort_views_by_dependency(){
+		$views=Array();
+		foreach($this->source->MetaTables('VIEWS') as $key => $value){
+			$views[]= Array(
+				"name" => $value,
+				"definition" => $this->get_view_definition($value),
+				"dependencies" => Array()
+			);
+		}
+		 
+		usort($views, array('self','cmp_len')); 
+		
+		// BUILD THE DEPENDENCY TABLE
+		foreach($views as $key => $view){
+			foreach($views as $depends_from_view){
+				if(strpos($views[$key]['definition'], $depends_from_view['name'])===false){
+				} else {
+					$views[$key]['definition'] = str_replace($depends_from_view['name'],"#####",$views[$key]['definition']);
+					$views[$key]['dependencies'][]=$depends_from_view['name'];
+				}
+			}
+		}
+		
+		// SORT THE VIEWS IN AN ORDER THAT MAKES THEM CREABLE WITH DEPENDENCIES RESOLVED
+		$sorted_views = Array();
+		$i=0;
+		while(count($views)>0&&$i<5){
+			foreach($views as $key => $cur_view){
+				foreach($cur_view['dependencies'] as $index => $dependency){
+					if(in_array($dependency,$sorted_views)){
+						unset($views[$key]['dependencies'][$index]);
+					}
+				}
+				if(count($views[$key]['dependencies'])==0){
+					$sorted_views[]=$cur_view['name'];
+					unset($views[$key]);
+				}
+			}
+			$i=$i+1;
+		}
+		return($sorted_views);
+	}
+	
+	private static function cmp_len($a, $b){ 
+	   return (strlen($a['name'])  < strlen($b['name']));
+	}
 	/* THIS WILL BE USED FOR PAGINATION PURPOSES
 	public function count_rows($table_name){
 		$sql="select * from $table_name";

@@ -77,8 +77,9 @@
 				);
 				$result['tables'][] = $temp;
 			}
-			$result['views'] = Array();
-			foreach($connessione_1->MetaTables('VIEWS') as $key => $value){
+			// EXTRACTING THE DB VIEWS IN AN ORDER THAT RESOLVES DEPENDENCIES, ALLOWING FOR SEQUENTIAL CREATION
+			$temp = $conversion_table->driver->sort_views_by_dependency();
+			foreach($temp as $key => $value){
 				$temp = Array(
 					"name" => $value,
 					"num_rows" => $conversion_table->driver->count_rows($value)
