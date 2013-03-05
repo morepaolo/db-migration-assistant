@@ -70,12 +70,24 @@
 		if(count($connessione_1->MetaTables('TABLES'))>0){
 			$result['code'] = 0;
 			$result['tables'] = Array();
+			$result['indexes'] = Array();
 			foreach($connessione_1->MetaTables('TABLES') as $key => $value){
 				$temp = Array(
 					"name" => $value,
 					"num_rows" => $conversion_table->driver->count_rows($value)
 				);
 				$result['tables'][] = $temp;
+				$indexes = $connessione_1->MetaIndexes($value);
+				foreach($indexes as $i => $v){
+					$temp = Array(
+						"table" => $value,
+						"name" => $i,
+						"columns" => Array()
+					);
+					foreach($v['columns'] as $column)
+						$temp['columns'][] = $column;
+					$result['indexes'][] = $temp;
+				}
 			}
 			// EXTRACTING THE DB VIEWS IN AN ORDER THAT RESOLVES DEPENDENCIES, ALLOWING FOR SEQUENTIAL CREATION
 			$temp = $conversion_table->driver->sort_views_by_dependency();
@@ -139,6 +151,26 @@
 		$view_name = $_GET['view_name'];
 		try{
 			$text = $conversion_table->driver->clone_view($view_name);
+			$result = Array();
+			$result['code']=0;
+			$result['text']=$text;
+		} catch(Exception $e){
+			$result = Array();
+			$result['code']=1;
+			$result['text']=$e->getCode()." ".$e->getMessage();
+		}
+		echo json_encode($result);
+	} elseif ($_GET['action']=="import_index"){
+		$conversion_table = new conversion_table($source_database_type, $dest_database_type);
+		$connessione_1 = db_connect($source_database_type, $source_host, $source_user, $source_password, $source_database);
+		$connessione_1->SetFetchMode(ADODB_FETCH_ASSOC);
+		$connessione_2 = db_connect($dest_database_type, $dest_host, $dest_user, $dest_password, $dest_database);
+		$connessione_2->SetFetchMode(ADODB_FETCH_ASSOC);
+		$conversion_table->driver->set_source_dest($connessione_1, $connessione_2);
+		$table_name = $_GET['table_name'];
+		$index_name = $_GET['index_name'];
+		try{
+			$text = $conversion_table->driver->clone_index($table_name, $index_name);
 			$result = Array();
 			$result['code']=0;
 			$result['text']=$text;

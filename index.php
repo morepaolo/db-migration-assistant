@@ -11,6 +11,7 @@
 			var must_stop=false;
 			var tables = [];
 			var views = [];
+			var indexes = [];
 			var rows_spooler = [];
 			var rows_x_request = 2000;
 			$(function() {
@@ -68,6 +69,12 @@
 																<tr id="views"> \
 																	<td></td><td><input type="checkbox" name="select_all_view_definition" id="select_all_view_definition" checked />TRY TO TRANSLATE VIEW</td><td></td> \
 																</tr> \
+																<tr> \
+																	<td colspan="3" style="background-color:#66CCFF;">INDEXES</td> \
+																</tr> \
+																<tr id="indexes"> \
+																	<td></td><td><input type="checkbox" name="select_all_indexes" id="select_all_indexes" checked />RECREATE INDEXES</td><td></td> \
+																</tr> \
 															</table>');
 										var table_row = '<tr> \
 															<td style="border-bottom:1px solid #acacac;">#NAME#</td> \
@@ -79,6 +86,11 @@
 															<td style="border-bottom:1px solid #acacac;"><input type="checkbox" class="check_definition" name="definition" id="definition" checked /></td> \
 															<td style="border-bottom:1px solid #acacac;" class="success">#NUM_ROWS# rows</td> \
 														</tr>';
+										var index_row = '<tr> \
+															<td style="border-bottom:1px solid #acacac;">#NAME#</td> \
+															<td style="border-bottom:1px solid #acacac;"><input type="checkbox" class="check_index" name="index" id="index" checked /></td> \
+															<td style="border-bottom:1px solid #acacac;">#DATA#</td> \
+														</tr>';				
 										$.each(result.tables, function(key, item){
 											tables.push(
 												{
@@ -177,6 +189,50 @@
 												//console.log(tables);
 											}
 										);
+										////////////////////
+										$.each(result.indexes, function(key, item){
+											indexes.push(
+												{
+													name: item.name,
+													table: item.table,
+													import_structure: true
+												}
+											);
+											var temp = index_row;
+											temp = temp.replace(/#NAME#/gi, item.name);
+											var data = "TABLE: "+item.table+"<br />COLUMNS: ";
+											$.each(item.columns, function(key, value){
+												data = data+value;
+											});
+											temp = temp.replace(/#DATA#/gi, data);
+											temp = $(temp);
+											temp.find("#index").click(
+												function(){
+													var cur_checkbox=$(this);												
+													$.each(indexes, function(key, index){
+														if(index.name==item.name){
+															index.import_structure=cur_checkbox.is(":checked")
+															console.log(index);
+															console.log("test");
+														}
+													});
+													//console.log(tables);
+												}
+											);
+											result_table.find("#indexes").after(temp);
+										});
+										result_table.find("#select_all_indexes").click(
+											function(){
+												var cur_checkbox=$(this);												
+												$.each(indexes, function(key, index){
+													console.log(index);
+													index.import_structure=cur_checkbox.is(":checked");
+												});
+												$(".check_index").attr('checked', cur_checkbox.is(":checked"));
+												//console.log(tables);
+											}
+										);
+										///////////////
 										$("div#tables").append(result_table);
 										$("#avvia").show();
 									}
@@ -370,14 +426,71 @@
 												}
 												 
 												promise_copy_view_definition.done(function(response){
-													if(must_stop)
+													if(must_stop){
 														var temp_message = createMessage(result.code, "IMPORT INTERRUPTED BY USER");
-													else
+														$("div#result").append(temp_message);
+														must_stop=false;
+														$("#avvia").show();
+														$("#ferma").hide();
+													} else {
 														var temp_message = createMessage(result.code, "ALL VIEW DEFINITIONS IMPORTED");
-													$("div#result").append(temp_message);
-													must_stop=false;
-													$("#avvia").show();
-													$("#ferma").hide();
+														$("div#result").append(temp_message);
+														/////////////
+														/* LA QUARTA CHAIN ESPORTA GLI INDICI */
+														var chain_copy_indexes = $.Deferred(); // Create the root of the chain.
+														var promise_copy_indexes; // Placeholder for the promise
+														var temp_indexes = JSON.parse(JSON.stringify(indexes)); 
+														 
+														// Build the chain
+														promise_copy_indexes = chain_copy_indexes;
+														for(var i = 0; i < indexes.length; i++)
+														{
+															// Pipe the response to the "next" function
+															promise_copy_indexes = promise_copy_indexes.pipe(function(response)
+															{
+																if(must_stop)
+																	return(true);
+																var index_def = this.shift(); // Get the current part
+																
+																var temp_message = createMessage(result.code, "EXPORTING INDEX <span class='table_name'>"+index_def.name+"</span>");
+																temp_message.find("#result").append('<img src="images/loader.gif" style="height:20px;" />');
+																$("div#result").append(temp_message);
+																$("div#result").scrollTop($("div#result")[0].scrollHeight);
+																return $.ajax({
+																		type: 'POST',
+																		url: "_index.php?action=import_index&table_name="+index_def.table+"&index_name="+index_def.name,
+																		data: connection_values,
+																		context: this,
+																		success: function(data){
+																			var result = $.parseJSON(data);
+																			if(result.code==0){
+																				
+																				temp_message.find("#result").addClass("success");
+																				temp_message.find("#result").html("OK");
+																			} else {
+																				temp_message.find("#result").addClass("error");
+																				temp_message.find("#result").html("ERROR: "+result.text);
+																			}
+																		}
+																	}
+																);
+															})
+														}
+														 
+														promise_copy_indexes.done(function(response){
+															if(must_stop)
+																var temp_message = createMessage(result.code, "IMPORT INTERRUPTED BY USER");
+															else
+																var temp_message = createMessage(result.code, "ALL INDEXES IMPORTED");
+															$("div#result").append(temp_message);
+															must_stop=false;
+															$("#avvia").show();
+															$("#ferma").hide();
+														});
+														 
+														chain_copy_indexes.resolveWith(temp_indexes); // Execute the chain
+														//////////////
+													}													
 												});
 												 
 												chain_copy_view_definition.resolveWith(temp_views); // Execute the chain

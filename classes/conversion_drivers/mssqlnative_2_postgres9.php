@@ -145,10 +145,7 @@ class mssqlnative_2_postgres9 extends generic_driver{
 					if(!isset($value))
 						$value="NULL";
 				} elseif($type=="datetime"){
-					//echo "FOUND DATETIME\r\n";
-					//echo $value."\r\n";
 					$value = $this->dest->DBDate($value);
-					//echo $value."\r\n";
 				}
 				$temp = str_replace("#".$field."#", $value, $temp);
 			}
@@ -210,7 +207,30 @@ class mssqlnative_2_postgres9 extends generic_driver{
 		}
 		return($sorted_views);
 	}
-	
+		
+	public function clone_index($table_name, $index_name){
+		if(in_array($table_name, $this->exclude_list))
+			throw new Exception("SKIPPED: table $table_name in exclude_list");
+		$indexes = $this->source->MetaIndexes($table_name);
+		$cur_index = $indexes[$index_name];
+		$columns = $cur_index['columns'];
+		$columns_string="";
+		foreach($columns as $index => $c){
+			if($index==count($columns)-1)
+				$columns_string.=$c;
+			else
+				$columns_string.=$c.", ";
+		}
+		try{
+			$dict = NewDataDictionary($this->dest);
+			$sqlarray = $dict->CreateIndexSQL($index_name, $table_name, $columns_string);
+			$dict->ExecuteSQLArray($sqlarray);
+		} catch(Exception $e){
+			throw $e;
+		}
+		return($sqlarray);
+	}
+
 	private static function cmp_len($a, $b){ 
 	   return (strlen($a['name'])  < strlen($b['name']));
 	}
