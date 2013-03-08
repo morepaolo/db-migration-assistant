@@ -72,8 +72,10 @@ class mssqlnative_2_postgres9 extends generic_driver{
 				throw new Exception("ERROR: NOT IMPLEMENTED FIELD ".$fields->type);
 			}
 
-			if($fields->is_identity)
+			if($fields->is_identity){
+				$identity_field = $fields->name;
 				$text.=" AUTOINCREMENT";
+			}
 			if($primary_keys){	
 				if(in_array($fields->name, $primary_keys))
 					$text.=" PRIMARY"; 
@@ -83,6 +85,13 @@ class mssqlnative_2_postgres9 extends generic_driver{
 		}
 		$sqlarray = $dict->CreateTableSQL($table_name, $text);
 		$dict->ExecuteSQLArray($sqlarray);
+		if(isset($identity_field)){
+			$sql = "select max($identity_field) as next_identity from $table_name";
+			$result = $this->source->Execute($sql);
+			$next_identity = $result->fields['next_identity']+1;
+			$sql = "ALTER SEQUENCE ".$table_name."_".$identity_field."_seq RESTART WITH $next_identity INCREMENT BY 1";
+			$result = $this->dest->Execute($sql);
+		}
 		return($text);
 	}
 	
