@@ -16,7 +16,7 @@
 	}
 	
 	date_default_timezone_set("Europe/Rome");
-	
+	echo "TESTING<br />";
 	$source_database_type = "mssqlnative";
     $source_host = "(local)\SQLEXPRESS";
     $source_user = "sa";
